@@ -55,8 +55,17 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         // 解析用户信息并放入上下文
         String username = jwtUtil.getUsernameFromToken(token);
         String role = jwtUtil.getRoleFromToken(token);
+        Long userId = jwtUtil.getUserIdFromToken(token);
 
-        UserContext.set(null, username, role);
+        if (userId == null) {
+            log.warn("JWT token missing user ID for URI: {}", requestUri);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"code\":401,\"message\":\"Token 无效\",\"data\":null}");
+            return false;
+        }
+
+        UserContext.set(userId, username, role);
 
         return true;
     }

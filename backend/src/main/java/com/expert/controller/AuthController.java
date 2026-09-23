@@ -2,6 +2,7 @@ package com.expert.controller;
 
 import com.expert.common.Result;
 import com.expert.service.AuthService;
+import com.expert.util.InputValidator;
 import com.expert.vo.LoginVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,14 +34,22 @@ public class AuthController {
     public Result<LoginVO> login(@RequestBody Map<String, String> params) {
         String username = params.get("username");
         String password = params.get("password");
+        
+        // 输入验证
         if (username == null || username.isBlank() || password == null || password.isBlank()) {
             return Result.error("用户名和密码不能为空");
         }
+        
         try {
-            LoginVO loginVO = authService.login(username, password);
+            // 验证输入安全性
+            InputValidator.validateSafeString(username, "用户名");
+            InputValidator.validateLength(username, 4, 20, "用户名");
+            InputValidator.validateLength(password, 8, 50, "密码");
+            
+            LoginVO loginVO = authService.login(username.trim(), password);
             return Result.success(loginVO);
         } catch (Exception e) {
-            log.error("登录失败: {}", e.getMessage(), e);
+            log.warn("登录失败: {}", e.getMessage());
             return Result.error(e.getMessage());
         }
     }
@@ -57,6 +66,8 @@ public class AuthController {
         String password = params.get("password");
         String realName = params.get("realName");
         String role = params.get("role");
+        
+        // 输入验证
         if (username == null || username.isBlank() || password == null || password.isBlank()) {
             return Result.error("用户名和密码不能为空");
         }
@@ -66,12 +77,33 @@ public class AuthController {
         if (role == null || role.isBlank()) {
             return Result.error("角色不能为空");
         }
+        
+        // 验证角色合法性
+        if (!isValidRole(role)) {
+            return Result.error("非法的角色类型");
+        }
+        
         try {
-            authService.register(username, password, realName, role);
+            // 验证输入安全性
+            InputValidator.validateUsername(username);
+            InputValidator.validatePassword(password);
+            InputValidator.validateSafeString(realName, "真实姓名");
+            InputValidator.validateLength(realName, 2, 50, "真实姓名");
+            
+            authService.register(username.trim(), password, realName.trim(), role.toUpperCase());
             return Result.success("注册成功");
         } catch (Exception e) {
-            log.error("注册失败: {}", e.getMessage(), e);
+            log.warn("注册失败: {}", e.getMessage());
             return Result.error(e.getMessage());
         }
+    }
+
+    /**
+     * 验证角色是否合法
+     */
+    private boolean isValidRole(String role) {
+        return "ADMIN".equalsIgnoreCase(role) 
+                || "DOCTOR".equalsIgnoreCase(role) 
+                || "PATIENT".equalsIgnoreCase(role);
     }
 }

@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -34,12 +34,19 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final SchedulingMapper schedulingMapper;
     private final PatientProfileMapper patientProfileMapper;
     private final AgentRunMapper agentRunMapper;
+    private final com.expert.common.IdempotencyChecker idempotencyChecker;
 
     private static final DateTimeFormatter REG_NO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Registration createRegistration(Long patientId, Long schedulingId) {
+        // 幂等性检查：防止重复挂号
+        String idempotencyKey = "REG:" + patientId + ":" + schedulingId;
+        if (!idempotencyChecker.isNewRequest(idempotencyKey)) {
+            throw new BizException("请勿重复提交挂号请求");
+        }
+
         // 查询排班信息
         Scheduling scheduling = schedulingMapper.findById(schedulingId);
         if (scheduling == null) {
@@ -51,6 +58,16 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (scheduling.getScheduleDate().isBefore(LocalDate.now())) {
             throw new BizException("排班已过期，不能挂号");
         }
+        
+        // 检查患者是否已挂该排班（业务幂等性）
+        List<Registration> existingRegs = registrationMapper.findByPatientId(patientId);
+        boolean alreadyRegistered = existingRegs.stream()
+                .anyMatch(reg -> reg.getSchedulingId().equals(schedulingId) 
+                        && !"CANCELLED".equals(reg.getStatus()));
+        if (alreadyRegistered) {
+            throw new BizException("您已挂该排班，请勿重复挂号");
+        }
+
         // 乐观锁减号源
         int rows = schedulingMapper.decrementRemain(schedulingId, scheduling.getVersion());
         if (rows == 0) {
@@ -74,7 +91,11 @@ public class RegistrationServiceImpl implements RegistrationService {
                 .deleted(0)
                 .build();
         registrationMapper.insert(registration);
-        log.info("挂号成功: registrationNo={}, patientId={}, schedulingId={}", registrationNo, patientId, schedulingId);
+        
+        // 脱敏日志：不记录敏感信息
+        log.info("挂号成功: registrationNo={}, patientId=[REDACTED], schedulingId={}", 
+                registrationNo, schedulingId);
+        
         return registration;
     }
 
@@ -126,11 +147,12 @@ public class RegistrationServiceImpl implements RegistrationService {
     }
 
     /**
-     * 生成挂号编号: REG + yyyyMMddHHmmss + 4位随机数
+     * 生成挂号编号: REG + yyyyMMddHHmmss + 6位随机数
+     * 使用 ThreadLocalRandom 提高并发性能
      */
     private String generateRegistrationNo() {
         String timestamp = LocalDateTime.now().format(REG_NO_FORMATTER);
-        int random = new Random().nextInt(9000) + 1000;
+        int random = ThreadLocalRandom.current().nextInt(900000) + 100000;
         return "REG" + timestamp + random;
     }
 }

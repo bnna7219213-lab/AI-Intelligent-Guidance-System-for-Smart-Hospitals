@@ -39,7 +39,7 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new BizException("密码错误");
         }
-        String token = jwtUtil.generateToken(user.getUsername(), user.getRole());
+        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), user.getRole());
         log.info("用户登录成功: {}", username);
         return LoginVO.builder()
                 .token(token)
