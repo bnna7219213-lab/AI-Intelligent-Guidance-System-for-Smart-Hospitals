@@ -1,0 +1,171 @@
+<template>
+  <el-container class="layout-container">
+    <el-aside width="220px" class="layout-aside">
+      <div class="logo">
+        <span class="logo-text">智慧医院导诊系统</span>
+      </div>
+      <el-menu
+        :default-active="activeMenu"
+        class="layout-menu"
+        background-color="#001529"
+        text-color="#bfcbd9"
+        active-text-color="#fff"
+        router
+      >
+        <el-menu-item index="/admin/users">
+          <el-icon><User /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/departments">
+          <el-icon><OfficeBuilding /></el-icon>
+          <span>科室管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/doctors">
+          <el-icon><UserFilled /></el-icon>
+          <span>医生管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/schedules">
+          <el-icon><Calendar /></el-icon>
+          <span>排班管理</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/symptom-tags">
+          <el-icon><PriceTag /></el-icon>
+          <span>症状标签</span>
+        </el-menu-item>
+        <el-sub-menu index="ai">
+          <template #title>
+            <el-icon><Cpu /></el-icon>
+            <span>AI管理</span>
+          </template>
+          <el-menu-item index="/admin/ai-config">AI配置</el-menu-item>
+          <el-menu-item index="/admin/prompts">提示词管理</el-menu-item>
+          <el-menu-item index="/admin/knowledge-base">知识库管理</el-menu-item>
+          <el-menu-item index="/admin/mcp-tools">MCP工具</el-menu-item>
+        </el-sub-menu>
+        <el-menu-item index="/admin/operations">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>运营分析</span>
+        </el-menu-item>
+        <el-menu-item index="/admin/observability">
+          <el-icon><Monitor /></el-icon>
+          <span>系统监控</span>
+        </el-menu-item>
+      </el-menu>
+    </el-aside>
+    <el-container>
+      <el-header class="layout-header">
+        <div class="header-left">
+          <span class="page-title">{{ currentPageTitle }}</span>
+        </div>
+        <div class="header-right">
+          <el-dropdown @command="handleCommand">
+            <span class="user-info">
+              <el-icon><UserFilled /></el-icon>
+              <span class="username">{{ username }}</span>
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </el-header>
+      <el-main class="layout-main">
+        <router-view />
+      </el-main>
+    </el-container>
+  </el-container>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '@/store/user'
+
+const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+
+const activeMenu = computed(() => route.path)
+const username = computed(() => userStore.username)
+const currentPageTitle = computed(() => route.meta?.title || '')
+
+function handleCommand(command) {
+  if (command === 'logout') {
+    userStore.logout()
+    router.push('/login')
+  }
+}
+</script>
+
+<style scoped>
+.layout-container {
+  height: 100vh;
+}
+
+.layout-aside {
+  background-color: #001529;
+  overflow: hidden;
+}
+
+.logo {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo-text {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.layout-menu {
+  border-right: none;
+  height: calc(100vh - 60px);
+}
+
+.layout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #e6e6e6;
+}
+
+.header-left .page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.user-info:hover {
+  background-color: #f5f5f5;
+}
+
+.username {
+  font-size: 14px;
+  color: #606266;
+}
+
+.layout-main {
+  background-color: #f0f2f5;
+  padding: 0;
+  overflow-y: auto;
+}
+</style>
