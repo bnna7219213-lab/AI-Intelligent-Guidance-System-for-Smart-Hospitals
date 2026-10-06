@@ -38,10 +38,10 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- Spring Boot AOP -->
+        <!-- Spring Boot AOP（Spring Boot 4 已将 starter-aop 重命名为 starter-aspectj） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
 
         <!-- Spring Boot Validation -->
@@ -159,6 +159,16 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- Redis 缓存（CacheManager/ConcurrentMapCacheManager 在 spring-context 中；spring-context-support 是 spring-data-redis 4.x 的编译依赖，提供 AbstractTransactionSupportingCacheManager） -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context-support</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
         <!-- Test -->

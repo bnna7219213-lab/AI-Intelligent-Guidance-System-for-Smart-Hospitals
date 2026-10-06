@@ -48,6 +48,16 @@ milvus:
   index-type: AUTOINDEX
   connect-timeout-ms: 5000
 
+# Redis 缓存（连接失败自动降级到本地内存缓存）
+redis:
+  enabled: ${REDIS_ENABLED:true}
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:}
+  database: 0
+  connect-timeout-ms: 3000
+  default-ttl-seconds: 600
+
 # Logging
 logging:
   level:

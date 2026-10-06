@@ -6,12 +6,18 @@ import com.expert.mapper.DepartmentMapper;
 import com.expert.service.DepartmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 /**
  * 科室服务实现
+ *
+ * 缓存策略（通过 RedisCacheConfig 透明切换 Redis / 内存 / 空缓存）：
+ * - listAll() / getById() 读取走缓存（缓存名 departments）
+ * - save / update / toggleStatus 写入后主动失效缓存
  */
 @Slf4j
 @Service
@@ -21,11 +27,13 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final DepartmentMapper departmentMapper;
 
     @Override
+    @Cacheable(cacheNames = "departments", key = "'listAll'")
     public List<Department> listAll() {
         return departmentMapper.findAll();
     }
 
     @Override
+    @CacheEvict(cacheNames = "departments", allEntries = true)
     public void save(Department department) {
         // 校验编码唯一性
         Department existing = departmentMapper.findByCode(department.getCode());
@@ -37,6 +45,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
 
     @Override
+    @CacheEvict(cacheNames = "departments", allEntries = true)
     public void update(Department department) {
         Department existing = departmentMapper.findById(department.getId());
         if (existing == null) {
@@ -47,6 +56,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
 
     @Override
+    @CacheEvict(cacheNames = "departments", allEntries = true)
     public void toggleStatus(Long id, Integer status) {
         Department existing = departmentMapper.findById(id);
         if (existing == null) {
@@ -57,6 +67,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
 
     @Override
+    @Cacheable(cacheNames = "departments", key = "'id:' + #id")
     public Department getById(Long id) {
         Department department = departmentMapper.findById(id);
         if (department == null) {
