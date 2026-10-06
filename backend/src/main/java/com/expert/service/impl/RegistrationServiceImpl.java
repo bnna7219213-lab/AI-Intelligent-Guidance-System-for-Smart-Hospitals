@@ -5,6 +5,7 @@ import com.expert.entity.AgentRun;
 import com.expert.entity.Registration;
 import com.expert.entity.Scheduling;
 import com.expert.mapper.AgentRunMapper;
+import com.expert.mapper.PatientProfileMapper;
 import com.expert.mapper.RegistrationMapper;
 import com.expert.mapper.SchedulingMapper;
 import com.expert.service.RegistrationService;

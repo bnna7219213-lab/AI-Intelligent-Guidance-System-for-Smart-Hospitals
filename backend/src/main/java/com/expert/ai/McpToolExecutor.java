@@ -20,7 +20,8 @@ import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -85,9 +86,14 @@ public class McpToolExecutor {
                             "【紧急警告】检测到红旗症状（危重标识），请优先推荐急诊科室！"));
                 }
 
-                // 调用模型
-                Response<AiMessage> response = chatModel.generate(conversationMessages, toolSpecifications);
-                AiMessage aiMessage = response.content();
+                // 调用模型（langchain4j 1.0.0-beta2 用 ChatRequest + chat()）
+                ChatResponse chatResponse = chatModel.chat(
+                        ChatRequest.builder()
+                                .messages(conversationMessages)
+                                .toolSpecifications(toolSpecifications)
+                                .build()
+                );
+                AiMessage aiMessage = chatResponse.aiMessage();
 
                 // 保存AI思考步骤
                 if (aiMessage.text() != null && !aiMessage.text().isBlank()) {
@@ -233,7 +239,7 @@ public class McpToolExecutor {
                     .map(ChatMessage::toString)
                     .collect(Collectors.joining(" "));
             return redFlagTags.stream()
-                    .any(tag -> tag.getName() != null && conversationText.contains(tag.getName()));
+                    .anyMatch(tag -> tag.getName() != null && conversationText.contains(tag.getName()));
         } catch (Exception e) {
             log.warn("红旗症状检测失败", e);
             return false;

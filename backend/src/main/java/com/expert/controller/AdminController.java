@@ -49,6 +49,8 @@ public class AdminController {
     private final DocumentEmbedService documentEmbedService;
 
     // ======================== 用户管理 ========================
+    @GetMapping("/users")
+    public Result<PageResult<SysUser>> listUsers(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(required = false) String keyword) {

@@ -78,19 +78,9 @@
             <version>${langchain4j.version}</version>
         </dependency>
 
-        <!-- LangChain4j Embedding Store InMemory -->
-        <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-in-memory-store</artifactId>
-            <version>${langchain4j.version}</version>
-        </dependency>
-
         <!-- LangChain4j Tool -->
-        <dependency>
-            <groupId>dev.langchain4j</groupId>
-            <artifactId>langchain4j-tools</artifactId>
-            <version>${langchain4j.version}</version>
-        </dependency>
+        <!-- 注意：1.0.0-beta2 中 langchain4j-tools / langchain4j-in-memory-store 在 Maven Central 上 404，
+             项目也未引用其 API（agent.tool.* 来自 langchain4j-core 传递依赖），故移除以避免编译阻塞。 -->
 
         <!-- Milvus Vector Database -->
         <dependency>
@@ -191,6 +181,19 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
         </plugins>

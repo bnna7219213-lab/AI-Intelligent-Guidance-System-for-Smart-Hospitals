@@ -12,7 +12,6 @@ import io.milvus.param.collection.HasCollectionParam;
 import io.milvus.param.collection.LoadCollectionParam;
 import io.milvus.param.collection.ReleaseCollectionParam;
 import io.milvus.param.index.CreateIndexParam;
-import io.milvus.response.HasCollectionResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 
@@ -92,14 +91,14 @@ public class MilvusConfig {
      * 确保目标集合存在，不存在则创建
      */
     private void ensureCollection(MilvusServiceClient client) {
-        R<HasCollectionResponse> hasResp = client.hasCollection(
+        // hasCollection 返回 R<Boolean>，data 即集合是否存在
+        R<Boolean> hasResp = client.hasCollection(
                 HasCollectionParam.newBuilder()
                         .withCollectionName(properties.getCollectionName())
                         .build()
         );
 
-        if (hasResp.getStatus() == R.Status.Success && hasResp.getData() != null
-                && hasResp.getData().hasCollection()) {
+        if (isSuccess(hasResp) && Boolean.TRUE.equals(hasResp.getData())) {
             log.info("集合已存在: {}", properties.getCollectionName());
             loadCollection(client);
             return;
@@ -107,38 +106,38 @@ public class MilvusConfig {
 
         log.info("创建集合: {}", properties.getCollectionName());
 
-        // 字段定义
+        // 字段定义（SDK 2.6.x 使用 io.milvus.grpc.DataType）
         FieldType idField = FieldType.newBuilder()
                 .withName("id")
-                .withDataType(io.milvus.param.DataType.Int64)
+                .withDataType(io.milvus.grpc.DataType.Int64)
                 .withPrimaryKey(true)
                 .withAutoID(false)
                 .build();
 
         FieldType groupIdField = FieldType.newBuilder()
                 .withName("groupId")
-                .withDataType(io.milvus.param.DataType.Int64)
+                .withDataType(io.milvus.grpc.DataType.Int64)
                 .build();
 
         FieldType documentIdField = FieldType.newBuilder()
                 .withName("documentId")
-                .withDataType(io.milvus.param.DataType.Int64)
+                .withDataType(io.milvus.grpc.DataType.Int64)
                 .build();
 
         FieldType chunkIndexField = FieldType.newBuilder()
                 .withName("chunkIndex")
-                .withDataType(io.milvus.param.DataType.Int64)
+                .withDataType(io.milvus.grpc.DataType.Int64)
                 .build();
 
         FieldType contentField = FieldType.newBuilder()
                 .withName("content")
-                .withDataType(io.milvus.param.DataType.VarChar)
+                .withDataType(io.milvus.grpc.DataType.VarChar)
                 .withMaxLength(65535)
                 .build();
 
         FieldType embeddingField = FieldType.newBuilder()
                 .withName("embedding")
-                .withDataType(io.milvus.param.DataType.FloatVector)
+                .withDataType(io.milvus.grpc.DataType.FloatVector)
                 .withDimension(properties.getDimension())
                 .build();
 
@@ -154,8 +153,8 @@ public class MilvusConfig {
                 .addFieldType(embeddingField)
                 .build();
 
-        R<R.RpcStatus> createResp = client.createCollection(createParam);
-        if (createResp.getStatus() != R.Status.Success) {
+        R<io.milvus.param.RpcStatus> createResp = client.createCollection(createParam);
+        if (!isSuccess(createResp)) {
             log.warn("创建集合失败: {}", createResp.getMessage());
             return;
         }
@@ -164,7 +163,7 @@ public class MilvusConfig {
         MetricType metric = resolveMetricType(properties.getMetricType());
         IndexType indexType = resolveIndexType(properties.getIndexType());
 
-        R<R.RpcStatus> indexResp = client.createIndex(
+        R<io.milvus.param.RpcStatus> indexResp = client.createIndex(
                 CreateIndexParam.newBuilder()
                         .withCollectionName(properties.getCollectionName())
                         .withFieldName("embedding")
@@ -173,13 +172,27 @@ public class MilvusConfig {
                         .withExtraParam("{\"nlist\":1024}")
                         .build()
         );
-        if (indexResp.getStatus() != R.Status.Success) {
+        if (!isSuccess(indexResp)) {
             log.warn("创建索引失败: {}", indexResp.getMessage());
             return;
         }
 
         loadCollection(client);
         log.info("集合创建完成: {}", properties.getCollectionName());
+    }
+
+    /**
+     * SDK 2.6.x 中 R.getStatus() 返回 Integer，用 R.Status.valueOf(int) 转成枚举比较
+     */
+    private boolean isSuccess(R<?> r) {
+        if (r == null || r.getStatus() == null) {
+            return false;
+        }
+        try {
+            return R.Status.valueOf(r.getStatus()) == R.Status.Success;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**
@@ -245,7 +258,7 @@ public class MilvusConfig {
                             .withCollectionName(collectionName)
                             .build()
             );
-            if (dropResp.getStatus() != R.Status.Success) {
+            if (!isSuccess(dropResp)) {
                 log.warn("删除集合失败: {}", dropResp.getMessage());
             }
 

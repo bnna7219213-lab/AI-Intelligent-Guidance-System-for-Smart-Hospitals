@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -29,6 +30,8 @@ public class Doctor {
     private String specialty;
 
     private String introduction;
+
+    private BigDecimal fee;
 
     private LocalDateTime createTime;
 

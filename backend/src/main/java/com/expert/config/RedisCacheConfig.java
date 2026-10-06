@@ -144,6 +144,9 @@ public class RedisCacheConfig {
 
     /**
      * 本地内存缓存：应用重启后清空，仅进程内共享
+     *
+     * 注意：aiConfig 不在此列表内 —— AiConfig 含 apiKey，禁止序列化到 Redis 外部存储，
+     * 因此 AI 配置保留进程内 ConcurrentHashMap + DB 双保险（见 AiConfigServiceImpl）。
      */
     private CacheManager localCacheManager() {
         ConcurrentMapCacheManager manager = new ConcurrentMapCacheManager();
@@ -151,8 +154,7 @@ public class RedisCacheConfig {
                 "departments",
                 "schedules",
                 "symptomTags",
-                "kbSearch",
-                "aiConfig"
+                "kbSearch"
         ));
         return manager;
     }

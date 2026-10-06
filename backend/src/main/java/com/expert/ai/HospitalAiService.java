@@ -2,14 +2,18 @@ package com.expert.ai;
 
 import com.expert.entity.AiUsageLog;
 import com.expert.service.AiUsageService;
+import dev.langchain4j.data.embedding.Embedding;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.StreamingResponseHandler;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.output.TokenUsage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -50,13 +54,14 @@ public class HospitalAiService {
             }
             messages.add(UserMessage.from(userMessage));
 
-            Response<AiMessage> response = modelFactory.getChatModel().generate(messages);
-            String result = response.content().text();
+            ChatResponse response = modelFactory.getChatModel().chat(messages);
+            String result = response.aiMessage().text();
 
             long duration = System.currentTimeMillis() - startTime;
-            int totalTokens = response.tokenUsage() != null ? response.tokenUsage().totalTokenCount() : 0;
-            int promptTokens = response.tokenUsage() != null ? response.tokenUsage().inputTokenCount() : 0;
-            int completionTokens = response.tokenUsage() != null ? response.tokenUsage().outputTokenCount() : 0;
+            TokenUsage usage = response.tokenUsage();
+            int totalTokens = usage != null ? usage.totalTokenCount() : 0;
+            int promptTokens = usage != null ? usage.inputTokenCount() : 0;
+            int completionTokens = usage != null ? usage.outputTokenCount() : 0;
 
             logUsage("CHAT", modelName, duration,
                     promptTokens, completionTokens, totalTokens, true, null);
@@ -88,7 +93,7 @@ public class HospitalAiService {
 
         try {
             StreamingChatLanguageModel streamingModel = modelFactory.getStreamingChatModel();
-            modelName = streamingModel.toString();
+            String resolvedModelName = streamingModel.toString();
 
             List<ChatMessage> messages = new ArrayList<>();
             if (systemPrompt != null && !systemPrompt.isBlank()) {
@@ -98,9 +103,9 @@ public class HospitalAiService {
 
             StringBuilder fullResponse = new StringBuilder();
 
-            streamingModel.generate(messages, new StreamingResponseHandler<>() {
+            streamingModel.chat(messages, new StreamingChatResponseHandler() {
                 @Override
-                public void onNext(String token) {
+                public void onPartialResponse(String token) {
                     if (onToken != null) {
                         onToken.accept(token);
                     }
@@ -108,13 +113,14 @@ public class HospitalAiService {
                 }
 
                 @Override
-                public void onComplete(Response<AiMessage> response) {
+                public void onCompleteResponse(ChatResponse response) {
                     long duration = System.currentTimeMillis() - startTime;
-                    int totalTokens = response.tokenUsage() != null ? response.tokenUsage().totalTokenCount() : 0;
-                    int promptTokens = response.tokenUsage() != null ? response.tokenUsage().inputTokenCount() : 0;
-                    int completionTokens = response.tokenUsage() != null ? response.tokenUsage().outputTokenCount() : 0;
+                    TokenUsage usage = response.tokenUsage();
+                    int totalTokens = usage != null ? usage.totalTokenCount() : 0;
+                    int promptTokens = usage != null ? usage.inputTokenCount() : 0;
+                    int completionTokens = usage != null ? usage.outputTokenCount() : 0;
 
-                    logUsage("SSE_CHAT", modelName, duration,
+                    logUsage("SSE_CHAT", resolvedModelName, duration,
                             promptTokens, completionTokens, totalTokens, true, null);
 
                     log.info("SSE_CHAT完成: duration={}ms, tokens={}", duration, totalTokens);
@@ -128,7 +134,7 @@ public class HospitalAiService {
                     long duration = System.currentTimeMillis() - startTime;
                     String errorMsg = translateError(error);
                     log.error("SSE_CHAT失败: {}", errorMsg, error);
-                    logUsage("SSE_CHAT", modelName, duration, 0, 0, 0, false, errorMsg);
+                    logUsage("SSE_CHAT", resolvedModelName, duration, 0, 0, 0, false, errorMsg);
                     if (onError != null) {
                         onError.accept(new RuntimeException(errorMsg, error));
                     }
@@ -159,7 +165,7 @@ public class HospitalAiService {
             EmbeddingModel embeddingModel = modelFactory.getEmbeddingModel();
             modelName = embeddingModel.toString();
 
-            Response<dev.langchain4j.model.embedding.Embedding> response = embeddingModel.embed(text);
+            Response<Embedding> response = embeddingModel.embed(text);
             float[] vector = response.content().vector();
 
             long duration = System.currentTimeMillis() - startTime;

@@ -9,6 +9,8 @@ import com.expert.mapper.KbChunkMapper;
 import com.expert.mapper.KbDocumentMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.AbstractMap;
@@ -40,6 +42,7 @@ public class RagService {
      * 删除文档的所有向量（MySQL + Milvus）
      * 在重新嵌入前调用，避免残留旧向量
      */
+    @CacheEvict(cacheNames = "kbSearch", allEntries = true)
     public void deleteDocumentVectors(Long documentId) {
         // 删除 MySQL 中的旧分块
         kbChunkMapper.deleteByDocumentId(documentId);
@@ -114,9 +117,12 @@ public class RagService {
     /**
      * 分块并向量化存储到 KB_CHUNK 表 + Milvus
      *
+     * 重新向量化后主动失效 kbSearch 缓存，确保检索结果反映最新知识库。
+     *
      * @param documentId 文档ID
      * @param groupId    分组ID
      */
+    @CacheEvict(cacheNames = "kbSearch", allEntries = true)
     public void embedAndStore(Long documentId, Long groupId) {
         KbDocument document = kbDocumentMapper.findById(documentId);
         if (document == null) {
@@ -182,11 +188,16 @@ public class RagService {
     /**
      * 语义搜索 - 优先使用 Milvus，降级到内存余弦
      *
+     * 缓存策略：embed + Milvus 检索是昂贵操作，对相同 query 走 kbSearch 缓存。
+     * 文档重新向量化（embedAndStore / deleteDocumentVectors / 重建集合）时主动失效。
+     *
      * @param query   查询文本
      * @param groupId 知识分组ID（收窄范围）
      * @param topK    返回条数
      * @return 匹配的KbChunk列表，按相似度降序
      */
+    @Cacheable(cacheNames = "kbSearch",
+            key = "'q:' + (#query == null ? '' : #query) + ':g' + (#groupId == null ? 'all' : #groupId) + ':k' + #topK")
     public List<KbChunk> search(String query, Long groupId, int topK) {
         // 1. 嵌入查询文本
         float[] queryVector = hospitalAiService.embed(query);

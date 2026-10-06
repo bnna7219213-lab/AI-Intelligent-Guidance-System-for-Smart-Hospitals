@@ -34,7 +34,7 @@ public interface SysUserMapper {
     // ===== Service Layer Methods =====
 
     @Select("SELECT id, username, password, real_name, phone, email, role, status, doctor_id, create_time, update_time " +
-            "FROM sys_user WHERE username LIKE CONCAT('%', #{keyword}, '%') OR real_name LIKE CONCAT('%', #{keyword}, "%') " +
+            "FROM sys_user WHERE username LIKE CONCAT('%', #{keyword}, '%') OR real_name LIKE CONCAT('%', #{keyword}, '%') " +
             "ORDER BY id DESC LIMIT #{offset}, #{pageSize}")
     List<SysUser> findByKeyword(@Param("keyword") String keyword, @Param("offset") int offset, @Param("pageSize") int pageSize);
 

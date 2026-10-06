@@ -9,6 +9,7 @@ import com.expert.service.DepartmentService;
 import com.expert.service.DoctorService;
 import com.expert.service.McpToolService;
 import com.expert.service.PromptTemplateService;
+import com.expert.service.SchedulingService;
 import com.expert.service.SymptomTagService;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
@@ -38,6 +39,7 @@ public class TriageAgentService {
     private final SymptomTagService symptomTagService;
     private final DepartmentService departmentService;
     private final DoctorService doctorService;
+    private final SchedulingService schedulingService;
 
     public TriageAgentService(HospitalAiService hospitalAiService,
                               McpToolExecutor mcpToolExecutor,
@@ -46,7 +48,8 @@ public class TriageAgentService {
                               PromptTemplateService promptTemplateService,
                               SymptomTagService symptomTagService,
                               DepartmentService departmentService,
-                              DoctorService doctorService) {
+                              DoctorService doctorService,
+                              SchedulingService schedulingService) {
         this.hospitalAiService = hospitalAiService;
         this.mcpToolExecutor = mcpToolExecutor;
         this.mcpToolService = mcpToolService;
@@ -55,6 +58,7 @@ public class TriageAgentService {
         this.symptomTagService = symptomTagService;
         this.departmentService = departmentService;
         this.doctorService = doctorService;
+        this.schedulingService = schedulingService;
     }
 
     /**
