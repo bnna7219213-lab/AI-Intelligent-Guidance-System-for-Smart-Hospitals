@@ -27,8 +27,9 @@ import java.util.List;
 
 /**
  * 知识库服务实现
- * 
+ *
  * 向量化存储委托给 RagService，实现 Milvus + 内存双模式
+ * 文档上传后可自动触发异步向量化（DocumentEmbedService）
  */
 @Slf4j
 @Service
@@ -39,10 +40,17 @@ public class KbServiceImpl implements KbService {
     private final KbGroupMapper kbGroupMapper;
     private final KbChunkMapper kbChunkMapper;
     private final RagService ragService;
+    private final DocumentEmbedService documentEmbedService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long docUpload(MultipartFile file, Long groupId) {
+        return docUpload(file, groupId, false);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long docUpload(MultipartFile file, Long groupId, boolean autoEmbed) {
         try {
             String originalFilename = file.getOriginalFilename();
             if (originalFilename == null) {
@@ -72,6 +80,13 @@ public class KbServiceImpl implements KbService {
                     .build();
             kbDocumentMapper.insert(document);
             log.info("文档上传成功: id={}, title={}", document.getId(), originalFilename);
+
+            // 可选：上传后自动触发异步向量化
+            if (autoEmbed) {
+                documentEmbedService.embedDocumentAsync(document.getId());
+                log.info("已触发异步向量化任务: id={}", document.getId());
+            }
+
             return document.getId();
         } catch (BizException e) {
             throw e;

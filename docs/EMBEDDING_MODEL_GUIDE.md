@@ -117,20 +117,35 @@ SET model_name = 'bge-large-zh-v1.5',
 WHERE config_key = 'VECTOR_MODEL';
 ```
 
-**Step 3**：重启应用，自动创建新维度集合
+**Step 3**：触发自动重建后台任务（推荐）
 
 ```bash
-# MilvusConfig 会检测到新维度，自动创建新集合
-# 如果使用同名集合但维度不同，会报错并需手动删除
+# 后端启动后，调用内置 API 自动完成「重建集合 + 全量重新嵌入」
+curl -X POST http://localhost:8080/api/admin/kb/rebuild \
+  -H "Authorization: Bearer <token>"
 ```
 
-**Step 4**：重新向量化知识库
-
-调用以下接口或脚本触发全量重建：
+系统会自动完成：
+1. 更新 Milvus 维度配置
+2. 释放 + 删除 + 按新维度重建集合
+3. 遍历所有文档重新分块和嵌入
 
 ```bash
-# 遍历所有文档，重新分块和嵌入
-POST /api/admin/kb/documents/{documentId}/chunk
+# 查询重建进度
+curl http://localhost:8080/api/admin/kb/rebuild/status \
+  -H "Authorization: Bearer <token>"
+```
+
+> 📖 详细文档见 `docs/VECTOR_REBUILD_TASK.md`
+
+**Step 4**：验证检索效果
+
+```bash
+# 重建完成后，调用语义搜索验证
+curl -X POST http://localhost:8080/api/admin/kb/search \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"头痛发热", "topK":5}'
 ```
 
 ---
@@ -467,11 +482,14 @@ private static final int DEFAULT_OVERLAP = 40;
 | 文件 | 用途 |
 |------|------|
 | `backend/.../config/MilvusProperties.java` | Milvus 配置属性（含 `dimension`） |
-| `backend/.../config/MilvusConfig.java` | Milvus 客户端 + 集合管理 |
+| `backend/.../config/MilvusConfig.java` | Milvus 客户端 + 集合管理（含 `rebuildCollection()`） |
 | `backend/.../ai/MilvusVectorStore.java` | 向量 CRUD 操作 |
-| `backend/.../ai/RagService.java` | 双模式 RAG 检索 |
+| `backend/.../ai/RagService.java` | 双模式 RAG 检索（Milvus + 内存降级） |
+| `backend/.../service/impl/VectorIndexRebuildService.java` | **自动重建后台任务**（维度检查+异步重建） |
+| `backend/.../vo/VectorIndexRebuildStatus.java` | 重建任务状态 DTO |
 | `backend/.../demo/EmbeddingModelSwitchDemo.java` | **模型切换 Demo**（本指南配套） |
 | `docs/MILVUS_INTEGRATION.md` | Milvus 集成指南 |
+| `docs/VECTOR_REBUILD_TASK.md` | 自动重建后台任务说明 |
 
 ---
 

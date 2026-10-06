@@ -87,25 +87,15 @@ export MILVUS_PORT=19530
 ```
 com.expert.config/
 ├── MilvusProperties.java      # Milvus 配置属性
-└── MilvusConfig.java          # 客户端初始化 + 集合管理
+└── MilvusConfig.java          # 客户端初始化 + 集合管理 + 集合重建
 
 com.expert.ai/
 ├── MilvusVectorStore.java     # 向量 CRUD 封装
 └── RagService.java            # RAG 检索（Milvus + 降级）
-```
-
-### 核心类
-
-#### MilvusProperties
-```java
-// 配置属性 POJO，绑定 milvus.* 配置项
-@ConfigurationProperties(prefix = "milvus")
-public class MilvusProperties {
-    private boolean enabled = true;
-    private String host = "localhost";
-    private int port = 19530;
+    private String dbName = "default";
     private String collectionName = "kb_chunk_vectors";
     private int dimension = 1536;
+    private long connectTimeoutMs = 5000;
     private String metricType = "COSINE";
     private String indexType = "AUTOINDEX";
 }
@@ -114,11 +104,34 @@ public class MilvusProperties {
 #### MilvusConfig
 ```java
 // 初始化 MilvusServiceClient 和集合
+// 与 @Bean 不同，启动时尝试连接，失败时自动降级到内存检索
 @Configuration
-@ConditionalOnProperty(name = "milvus.enabled", havingValue = "true")
 public class MilvusConfig {
-    @Bean
-    public MilvusServiceClient milvusServiceClient() { ... }
+
+    @PostConstruct
+    public void init() {
+        if (!properties.isEnabled()) {
+            log.info("Milvus 已禁用，使用内存检索");
+            return;
+        }
+        try {
+            ConnectParam param = ConnectParam.newBuilder()
+                .withHost(properties.getHost())
+                .withPort(properties.getPort())
+                .withDatabaseName(properties.getDbName())
+                .withConnectTimeout(properties.getConnectTimeoutMs(), TimeUnit.MILLISECONDS)
+                .build();
+            MilvusServiceClient client = new MilvusServiceClient(param);
+            clientRef.set(client);
+            ensureCollection(client);      // 确保集合存在
+            available.set(true);
+        } catch (Exception e) {
+            available.set(false);          // 降级到内存检索
+        }
+    }
+
+    public boolean rebuildCollection() { ... }        // 释放+删除+重建
+    public boolean rebuildWithNewDimension(int dim) { ... }
 }
 ```
 
@@ -126,10 +139,9 @@ public class MilvusConfig {
 ```java
 // 向量操作封装
 @Component
-@ConditionalOnBean(MilvusServiceClient.class)
 public class MilvusVectorStore {
     public boolean upsert(Long id, Long groupId, Long documentId, int chunkIndex, String content, List<Float> vector);
-    public boolean batchUpsert(List<VectorEntity> entities);
+    public boolean batchUpsert(List<VectorEntity> entities);   // 批量写入
     public List<VectorSearchResult> search(float[] queryVector, Long groupId, int topK);
     public boolean deleteByDocumentId(Long documentId);
     public boolean deleteByGroupId(Long groupId);
@@ -245,6 +257,14 @@ A: 确认嵌入模型的输出维度与 `milvus.dimension` 配置一致。
 
 ### Q: 如何切换到内存模式？
 A: 设置 `milvus.enabled=false`，系统自动降级到内存检索。
+
+### Q: 切换 Embedding 模型后维度不一致怎么办？
+A: 调用 `POST /api/admin/kb/rebuild`，系统会自动：
+1. 更新 Milvus 维度配置
+2. 释放 + 删除 + 按新维度重建集合
+3. 遍历所有文档重新分块和嵌入
+
+详见 `docs/VECTOR_REBUILD_TASK.md`。
 
 ### Q: 数据量增长后性能下降？
 A: Milvus 支持水平扩展，可以：

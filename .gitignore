@@ -1,0 +1,42 @@
+# ===== 构建产物 =====
+backend/target/
+frontend/dist/
+frontend/node_modules/
+
+# ===== 运行时产物 =====
+*.log
+logs/
+*.pid
+
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+.classpath
+.project
+.settings/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== 本地工具 / 会话 =====
+.box-agent/
+.box-agent-scratch/
+*.artifact.json
+
+# ===== 敏感配置（不要提交密钥） =====
+*.env
+application-local.yml
+application-prod.yml
+
+# ===== 依赖/包 =====
+frontend/yarn.lock
+frontend/package-lock.json
+
+# ===== 其他 =====
+*.class
+*.jar
+*.war

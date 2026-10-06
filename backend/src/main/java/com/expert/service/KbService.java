@@ -13,13 +13,23 @@ import java.util.List;
 public interface KbService {
 
     /**
-     * 上传文档并解析文本
+     * 上传文档并解析文本（默认不自动触发向量化）
      *
      * @param file    上传文件
      * @param groupId 分组ID
      * @return 文档ID
      */
     Long docUpload(MultipartFile file, Long groupId);
+
+    /**
+     * 上传文档并解析文本，可选自动触发异步向量化
+     *
+     * @param file      上传文件
+     * @param groupId   分组ID
+     * @param autoEmbed true 时上传成功后自动触发后台向量化任务
+     * @return 文档ID
+     */
+    Long docUpload(MultipartFile file, Long groupId, boolean autoEmbed);
 
     /**
      * 对文档进行分块并向量化存储

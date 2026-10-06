@@ -31,19 +31,8 @@
 - **Java JWT (jjwt 0.12.6)** - 认证
 - **Spring Security Crypto** - BCrypt密码加密
 - **Apache POI + PDFBox** - 文档解析
-- **JDK 21** - 运行环境
-
-### 前端
-- **Vue 3.5** - 框架
-- **Vite 6** - 构建工具
-- **Element Plus 2.8** - UI组件库
-- **Pinia 2.2** - 状态管理
-- **Vue Router 4.4** - 路由
-- **Axios 1.7** - HTTP客户端
-- **ECharts 5.5** - 数据可视化
-
-### 数据库
-- **MySQL 8.0+** - 主数据库
+- **MySQL 8.0+** - 主数据库（业务数据）
+- **Milvus 2.6+** - 向量数据库（RAG 语义检索）
 
 ### AI模型
 - 走OpenAI兼容接口，需要两类API Key:
@@ -59,102 +48,8 @@
 | JDK | 21+ |
 | Maven | 3.8+ |
 | MySQL | 8.0+ |
-| Node.js | 18+ |
-
----
-
-## 四、快速启动
-
-### 4.1 数据库准备
-
-```bash
-# 登录MySQL并执行初始化脚本
-mysql -u root -p < sql/hospital_init.sql
-```
-
-这会自动创建 `ai_hospital` 数据库和所有表，并插入初始数据（管理员、默认科室、Prompt模板等）。
-
-### 4.2 后端启动
-
-```bash
-cd backend
-
-# 1. 修改数据库配置
-# 编辑 src/main/resources/application.yml 中的数据库账号密码
-
-# 2. 修改IDEA/编译器的Project SDK为JDK 21
-
-# 3. Maven构建
-mvn clean package -DskipTests
-
-# 4. 启动
-java -jar target/ai-hospital-1.0.0.jar
-```
-
-或直接运行 `AiHospitalApplication.java` 的 main 方法。
-
-### 4.3 前端启动
-
-```bash
-cd frontend
-
-# 1. 安装依赖
-npm install
-
-# 2. 启动开发服务器
-npm run dev
-```
-
-前端默认运行在 `http://localhost:5173`，API请求会自动代理到 `http://localhost:8080`。
-
-### 4.4 配置AI模型(首次启动后)
-
-1. 打开浏览器访问 `http://localhost:5173`
-2. 使用默认管理员账号登录: **`admin / admin123`**
-3. 进入 **系统管理 → AI模型配置**
-4. 分别配置:
-   - **聊天模型**: API地址、API Key、模型名称
-   - **向量模型**: API地址、API Key、模型名称
-5. 点击 **测试连接** 验证配置正确
-6. 点击 **保存** — 立即生效，无需重启服务
-
-支持的OpenAI兼容接口:
-- OpenAI官方: `https://api.openai.com/v1`
-- DeepSeek: `https://api.deepseek.com/v1`
-- 智谱GLM: `https://open.bigmodel.cn/api/paas/v4`
-- 阿里DashScope: `https://dashscope.aliyuncs.com/compatible-mode/v1`
-- 本地Ollama/Ollama-OpenAI-compat
-
----
-
-## 五、初始账号
-
-| 账号 | 密码 | 角色 |
-|------|------|------|
-| admin | admin123 | 管理员 |
-
-医生和患者账号需由管理员在后台创建。
-
----
-
-## 六、项目结构
-
-```
-AI智慧医院智能导诊系统/
-├── sql/
-│   └── hospital_init.sql          # 数据库初始化脚本
-├── backend/                        # 后端项目
-│   ├── pom.xml
-│   └── src/main/
-│       ├── java/com/expert/
-│       │   ├── AiHospitalApplication.java
-│       │   ├── controller/         # REST控制器
-│       │   │   ├── AuthController.java
-│       │   │   ├── AdminController.java
-│       │   │   ├── DoctorController.java
-│       │   │   └── PatientController.java
-│       │   ├── service/            # 业务逻辑层
-│       │   │   ├── impl/           # 实现类
+│       │   │   │   ├── VectorIndexRebuildService.java  # 向量索引自动重建后台任务
+│       │   │   │   └── DocumentEmbedService.java       # 知识库文档异步向量化
 │       │   │   ├── AuthService.java
 │       │   │   ├── UserService.java
 │       │   │   ├── HospitalAiService.java  # 统一AI出口
@@ -164,13 +59,18 @@ AI智慧医院智能导诊系统/
 │       │   ├── ai/                 # AI核心模块
 │       │   │   ├── HospitalAiService.java    # 统一AI调用出口
 │       │   │   ├── ModelFactory.java         # 模型构建工厂
-│       │   │   ├── RagService.java           # RAG知识库服务
+│       │   │   ├── RagService.java           # RAG知识库服务（Milvus+内存降级）
+│       │   │   ├── MilvusVectorStore.java    # Milvus 向量CRUD封装
 │       │   │   ├── TriageAgentService.java   # ReAct分诊Agent
 │       │   │   └── McpToolExecutor.java      # MCP工具执行器
 │       │   ├── config/             # 配置类
+│       │   │   ├── MilvusProperties.java     # Milvus 配置属性
+│       │   │   └── MilvusConfig.java         # Milvus 客户端+集合管理
 │       │   ├── security/           # JWT认证
 │       │   ├── common/             # 通用工具
 │       │   ├── vo/                 # 视图对象
+│       │   │   ├── VectorIndexRebuildStatus.java   # 向量重建任务状态
+│       │   │   └── DocumentEmbedStatus.java        # 文档异步嵌入状态
 │       │   └── util/               # 工具类
 │       └── resources/
 │           └── application.yml
@@ -250,14 +150,18 @@ Base URL: `http://localhost:8080/api`
 | PUT  | /admin/ai-configs | 保存AI配置 |
 | POST | /admin/ai-configs/test | 测试连通性 |
 | GET  | /admin/kb/groups | 知识库分组 |
-| POST | /admin/kb/documents | 上传文档 |
-| POST | /admin/kb/documents/{id}/embed | 向量化 |
+| POST | /admin/kb/documents | 上传文档（autoEmbed=true 默认异步向量化） |
+| POST | /admin/kb/documents/{id}/embed | 同步向量化 |
+| POST | /admin/kb/documents/{id}/embed-async | **异步向量化（立即返回）** |
+| GET  | /admin/kb/documents/{id}/embed/status | **查询异步向量化进度** |
 | POST | /admin/kb/search | 语义检索 |
 | GET  | /admin/mcp-tools | MCP工具列表 |
 | PUT  | /admin/mcp-tools/{id}/toggle | 工具开关 |
 | GET  | /admin/operations/triage-hit-rate | **分诊命中率** |
 | GET  | /admin/observability/agent-runs?pageNum=1 | Agent执行记录 |
 | GET  | /admin/observability/ai-usage | AI调用统计 |
+| POST | /admin/kb/rebuild | **触发向量索引自动重建** |
+| GET  | /admin/kb/rebuild/status | **查询重建任务进度** |
 
 ### 医生接口
 | 方法 | 路径 | 说明 |

@@ -7,6 +7,7 @@ import com.expert.mapper.AgentStepMapper;
 import com.expert.mapper.RegistrationMapper;
 import com.expert.mapper.SchedulingMapper;
 import com.expert.service.*;
+import com.expert.service.impl.DocumentEmbedService;
 import com.expert.service.impl.VectorIndexRebuildService;
 import com.expert.util.PageResult;
 import com.expert.vo.*;
@@ -22,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 管理员控制器 - 用户管理、科室管理、排班管理、AI配置、知识库、MCP工具、症状标签、运营看板、可观测性
+ * 管理后台 Controller
  */
 @Slf4j
 @RestController
@@ -45,14 +46,9 @@ public class AdminController {
     private final RegistrationMapper registrationMapper;
     private final SchedulingMapper schedulingMapper;
     private final VectorIndexRebuildService vectorIndexRebuildService;
+    private final DocumentEmbedService documentEmbedService;
 
     // ======================== 用户管理 ========================
-
-    /**
-     * 分页查询所有用户
-     */
-    @GetMapping("/users")
-    public Result<PageResult<SysUser>> listUsers(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(required = false) String keyword) {
@@ -350,9 +346,13 @@ public class AdminController {
      */
     @PostMapping("/kb/documents")
     public Result<String> uploadKbDocument(@RequestParam("file") MultipartFile file,
-                                           @RequestParam Long groupId) {
+                                           @RequestParam Long groupId,
+                                           @RequestParam(required = false, defaultValue = "true") Boolean autoEmbed) {
         try {
-            Long docId = kbService.docUpload(file, groupId);
+            Long docId = kbService.docUpload(file, groupId, autoEmbed != null && autoEmbed);
+            if (autoEmbed != null && autoEmbed) {
+                return Result.success("文档上传成功，向量化任务已在后台启动，ID: " + docId);
+            }
             return Result.success("文档上传成功，ID: " + docId);
         } catch (Exception e) {
             log.error("上传知识库文档失败: {}", e.getMessage(), e);
@@ -361,7 +361,7 @@ public class AdminController {
     }
 
     /**
-     * 文档分块并向量化
+     * 文档分块并向量化（同步，可能耗时较长）
      */
     @PostMapping("/kb/documents/{id}/embed")
     public Result<String> embedKbDocument(@PathVariable Long id) {
@@ -370,6 +370,33 @@ public class AdminController {
             return Result.success("文档向量化完成");
         } catch (Exception e) {
             log.error("文档向量化失败: {}", e.getMessage(), e);
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 文档分块并向量化（异步，立即返回）
+     */
+    @PostMapping("/kb/documents/{id}/embed-async")
+    public Result<DocumentEmbedStatus> embedKbDocumentAsync(@PathVariable Long id) {
+        try {
+            documentEmbedService.embedDocumentAsync(id);
+            return Result.success("异步向量化任务已启动", documentEmbedService.getEmbedStatus(id));
+        } catch (Exception e) {
+            log.error("启动异步向量化失败: {}", e.getMessage(), e);
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 查询文档异步向量化任务状态
+     */
+    @GetMapping("/kb/documents/{id}/embed/status")
+    public Result<DocumentEmbedStatus> getEmbedStatus(@PathVariable Long id) {
+        try {
+            return Result.success(documentEmbedService.getEmbedStatus(id));
+        } catch (Exception e) {
+            log.error("查询向量化状态失败: {}", e.getMessage(), e);
             return Result.error(e.getMessage());
         }
     }
